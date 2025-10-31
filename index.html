@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Clock · Timer · Stopwatch — Unified Box</title>
+
+<!-- ======================= 🌈 CSS SECTION ======================= -->
+<style>
+  :root{
+    --bg1:#f2f8ff;
+    --bg2:#eaf3ff;
+    --card:#ffffff;
+    --muted:rgba(10,18,28,0.55);
+    --text:#071024;
+    --accent:#2b6ef6;
+    --panel-shadow: 0 12px 40px rgba(9,20,40,0.06);
+    --glass: rgba(255,255,255,0.7);
+    --control-bg: rgba(0,0,0,0.04);
+  }
+  html.theme-dark{
+    --bg1:#071024;
+    --bg2:#041528;
+    --card:#0b1222;
+    --muted:rgba(230,238,248,0.65);
+    --text:#e6eef8;
+    --accent:#fbbf24;
+    --panel-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    --glass: rgba(255,255,255,0.03);
+    --control-bg: rgba(255,255,255,0.03);
+  }
+
+  html,body{height:100%;margin:0}
+  body{
+    display:grid;place-items:center;
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+    background:linear-gradient(180deg,var(--bg1),var(--bg2));
+    transition:background 700ms ease,color 400ms ease;
+    color:var(--text);
+    padding:28px;
+  }
+
+  .card{
+    width:min(980px,94vw);
+    border-radius:14px;
+    padding:16px;
+    background:var(--card);
+    box-shadow:var(--panel-shadow);
+    display:grid;
+    grid-template-columns:1fr 260px;
+    gap:14px;
+  }
+  @media (max-width:900px){ .card{grid-template-columns:1fr;} }
+
+  .header{
+    grid-column:1/-1;
+    display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;
+  }
+
+  .tabs{display:flex;gap:8px;}
+  .tab{
+    padding:8px 14px;border:none;border-radius:10px;background:transparent;
+    color:var(--muted);font-weight:700;cursor:pointer;
+  }
+  .tab[aria-selected="true"]{
+    background:var(--glass);color:var(--text);
+  }
+
+  .top-controls{display:flex;align-items:center;gap:16px;}
+
+  .theme-toggle{background:transparent;border:none;padding:6px;cursor:pointer;width:50px;height:50px;}
+  .theme-toggle svg{width:44px;height:44px;}
+  .sun,.cloud{transition:all 900ms cubic-bezier(.4,.1,.2,1);}
+  html:not(.theme-dark) .cloud{transform:translateX(-140%) scale(1.2);opacity:0;}
+  html.theme-dark .cloud{transform:translateX(0%) scale(1.2);opacity:1;}
+  html.theme-dark .sun circle{filter:brightness(.75);}
+
+  .format-switch{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;}
+  .switch{width:76px;height:34px;border-radius:999px;background:var(--control-bg);padding:4px;display:flex;align-items:center;position:relative;border:none;cursor:pointer;}
+  .knob{width:28px;height:26px;border-radius:999px;background:var(--glass);transition:transform 240ms cubic-bezier(.2,.9,.3,1);}
+  .switch.pressed .knob{transform:translateX(38px);}
+  .format-label{font-size:12px;color:var(--muted)}
+
+  .display{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:18px;border-radius:12px;
+    background:linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0.35));
+  }
+  html.theme-dark .display{background:#0f1729;}
+
+  .time-row{
+    display:flex;align-items:center;gap:12px;justify-content:center;width:100%;
+  }
+  .time-block{
+    min-width:120px;padding:8px 14px;border-radius:12px;
+    font-weight:900;font-variant-numeric:tabular-nums lining-nums;
+    font-feature-settings:"tnum","lnum";
+    font-size:clamp(2rem,10vw,5rem);
+    text-align:center;line-height:1;letter-spacing:0.05em;
+  }
+  .sep{font-size:clamp(1.6rem,4vw,3.6rem);color:var(--muted);font-weight:800;}
+
+  .subline{margin-top:10px;color:var(--muted);font-weight:700;font-size:13px;}
+
+  .panel-controls{margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  .btn{padding:8px 12px;border-radius:10px;border:none;background:var(--glass);font-weight:800;cursor:pointer;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+
+  .inputs{display:flex;gap:8px;justify-content:center;margin-top:8px;}
+  .inputs input{width:76px;padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);text-align:center;font-weight:800;}
+
+  .right{width:100%;max-width:260px;}
+  .side{padding:12px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.55),rgba(255,255,255,0.12));}
+  html.theme-dark .side{background:#111a2f;}
+  .laps{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow:auto;padding-right:6px;}
+  .lap{display:flex;justify-content:space-between;padding:6px 8px;border-radius:8px;font-family:ui-monospace,monospace;}
+  .lap.fastest{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 20%,transparent),transparent);}
+  .muted{color:var(--muted);font-size:13px;font-weight:700;}
+</style>
+</head>
+
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="tabs">
+        <button class="tab" aria-selected="true" data-target="clock">Clock</button>
+        <button class="tab" aria-selected="false" data-target="timer">Timer</button>
+        <button class="tab" aria-selected="false" data-target="stopwatch">Stopwatch</button>
+      </div>
+
+      <div class="top-controls">
+        <div class="format-switch">
+          <span class="format-label">12-hour</span>
+          <button id="formatSwitch" class="switch"><div class="knob"></div></button>
+          <span class="format-label">24-hour</span>
+        </div>
+
+        <button id="themeBtn" class="theme-toggle">
+          <svg viewBox="0 0 100 100">
+            <g class="sun"><circle cx="50" cy="50" r="20" fill="#f6c945"/></g>
+            <g class="cloud">
+              <ellipse cx="60" cy="62" rx="18" ry="11" fill="#fff"/>
+              <ellipse cx="47" cy="67" rx="14" ry="9" fill="#fff"/>
+              <ellipse cx="72" cy="67" rx="14" ry="9" fill="#fff"/>
+            </g>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ==== main display ==== -->
+    <div>
+      <div id="panel" class="display">
+        <!-- CLOCK -->
+        <div id="view-clock">
+          <div class="time-row">
+            <div class="time-block" id="clk-h">00</div><div class="sep">:</div>
+            <div class="time-block" id="clk-m">00</div><div class="sep">:</div>
+            <div class="time-block" id="clk-s">00</div>
+            <div id="ampm" style="margin-left:8px;font-weight:900;color:var(--muted);font-size:16px;display:none">AM</div>
+          </div>
+          <div class="subline">Local time</div>
+        </div>
+
+        <!-- TIMER -->
+        <div id="view-timer" style="display:none;">
+          <div class="time-row">
+            <div class="time-block" id="timer-display">00:00:00.000</div>
+          </div>
+          <div class="inputs">
+            <input type="number" id="t-h" placeholder="HH" min="0">
+            <input type="number" id="t-m" placeholder="MM" min="0" max="59">
+            <input type="number" id="t-s" placeholder="SS" min="0" max="59">
+          </div>
+          <div class="panel-controls">
+            <button class="btn" id="start-timer">Start</button>
+            <button class="btn" id="reset-timer">Reset</button>
+          </div>
+        </div>
+
+        <!-- STOPWATCH -->
+        <div id="view-stopwatch" style="display:none;">
+          <div class="time-row">
+            <div class="time-block" id="sw-display">00:00:00.000</div>
+          </div>
+          <div class="panel-controls">
+            <button class="btn" id="sw-start">Start</button>
+            <button class="btn" id="sw-lap" disabled>Lap</button>
+            <button class="btn" id="sw-reset" disabled>Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div id="laps-panel" class="side" style="display:none;">
+        <div class="muted">Laps</div>
+        <div id="laps" class="laps"></div>
+      </div>
+    </div>
+  </div>
+
+<!-- ======================= ⚙️ JS SECTION ======================= -->
+<script>
+(function(){
+  const html=document.documentElement;
+  const themeBtn=document.getElementById('themeBtn');
+  const formatSwitch=document.getElementById('formatSwitch');
+  const tabs=document.querySelectorAll('.tab');
+  const views={clock:document.getElementById('view-clock'),
+               timer:document.getElementById('view-timer'),
+               stopwatch:document.getElementById('view-stopwatch')};
+  const lapsPanel=document.getElementById('laps-panel');
+  const lapsList=document.getElementById('laps');
+
+  // theme + format prefs
+  let is24=localStorage.getItem('pref-24')==='true';
+  let theme=localStorage.getItem('pref-theme')||
+    (window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+  if(theme==='dark')html.classList.add('theme-dark');
+  if(is24)formatSwitch.classList.add('pressed');
+
+  themeBtn.onclick=()=>{
+    const toDark=!html.classList.contains('theme-dark');
+    html.classList.toggle('theme-dark',toDark);
+    localStorage.setItem('pref-theme',toDark?'dark':'light');
+  };
+  formatSwitch.onclick=()=>{
+    is24=!is24;formatSwitch.classList.toggle('pressed',is24);
+    localStorage.setItem('pref-24',String(is24));
+  };
+
+  // tab logic
+  tabs.forEach(btn=>{
+    btn.onclick=()=>{
+      tabs.forEach(b=>b.setAttribute('aria-selected','false'));
+      btn.setAttribute('aria-selected','true');
+      for(const v in views) views[v].style.display='none';
+      const t=btn.dataset.target;
+      views[t].style.display='block';
+      lapsPanel.style.display=(t==='stopwatch')?'block':'none';
+    };
+  });
+
+  // Clock
+  const clkH=document.getElementById('clk-h'),clkM=document.getElementById('clk-m'),clkS=document.getElementById('clk-s'),ampm=document.getElementById('ampm');
+  function two(n){return(n<10?'0':'')+n;}
+  function updateClock(){
+    const now=new Date();
+    let h=now.getHours(),m=now.getMinutes(),s=now.getSeconds();
+    if(!is24){ampm.style.display='inline-block';ampm.textContent=(h>=12?'PM':'AM');h=h%12||12;}
+    else ampm.style.display='none';
+    clkH.textContent=two(h);clkM.textContent=two(m);clkS.textContent=two(s);
+  }
+  setInterval(updateClock,1000);updateClock();
+
+  // Timer
+  let tInt=null,tEnd=null;
+  const tDisplay=document.getElementById('timer-display');
+  document.getElementById('start-timer').onclick=()=>{
+    const h=+document.getElementById('t-h').value||0,
+          m=+document.getElementById('t-m').value||0,
+          s=+document.getElementById('t-s').value||0;
+    tEnd=Date.now()+((h*3600+m*60+s)*1000);
+    clearInterval(tInt);
+    tInt=setInterval(()=>{
+      const rem=tEnd-Date.now();
+      if(rem<=0){clearInterval(tInt);tDisplay.textContent='00:00:00.000';return;}
+      const ms=rem%1000,sec=Math.floor(rem/1000)%60,min=Math.floor(rem/60000)%60,hr=Math.floor(rem/3600000);
+      tDisplay.textContent=`${two(hr)}:${two(min)}:${two(sec)}.${ms.toString().padStart(3,'0')}`;
+    },10);
+  };
+  document.getElementById('reset-timer').onclick=()=>{
+    clearInterval(tInt);tDisplay.textContent='00:00:00.000';
+  };
+
+  // Stopwatch
+  let swInt=null,swStart=null,elapsed=0,laps=[];
+  const swDisplay=document.getElementById('sw-display'),
+        swStartBtn=document.getElementById('sw-start'),
+        swLapBtn=document.getElementById('sw-lap'),
+        swResetBtn=document.getElementById('sw-reset');
+  function fmt(ms){
+    const totalSec=Math.floor(ms/1000),
+      hr=Math.floor(totalSec/3600),
+      min=Math.floor((totalSec%3600)/60),
+      sec=totalSec%60,
+      milli=ms%1000;
+    return `${two(hr)}:${two(min)}:${two(sec)}.${milli.toString().padStart(3,'0')}`;
+  }
+  function updSW(){swDisplay.textContent=fmt(Date.now()-swStart+elapsed);}
+  swStartBtn.onclick=()=>{
+    if(swInt){ // stop
+      clearInterval(swInt);swInt=null;elapsed+=Date.now()-swStart;
+      swStartBtn.textContent='Start';swLapBtn.disabled=true;swResetBtn.disabled=false;
+    }else{ // start
+      swStart=Date.now();swInt=setInterval(updSW,10);
+      swStartBtn.textContent='Stop';swLapBtn.disabled=false;swResetBtn.disabled=true;
+    }
+  };
+  swLapBtn.onclick=()=>{
+    if(!swInt)return;
+    const total=Date.now()-swStart+elapsed;
+    const lastLap=laps.length?laps[laps.length-1].total:0;
+    const lapTime=total-lastLap;
+    laps.push({total,lapTime});
+    const lapDiv=document.createElement('div');
+    lapDiv.className='lap';
+    lapDiv.innerHTML=`<span>Lap ${laps.length}</span><span>${fmt(lapTime)}</span>`;
+    lapsList.appendChild(lapDiv);
+    // highlight fastest
+    const fastest=Math.min(...laps.map(l=>l.lapTime));
+    [...lapsList.children].forEach((c,i)=>{
+      c.classList.toggle('fastest',laps[i].lapTime===fastest);
+    });
+  };
+  swResetBtn.onclick=()=>{
+    clearInterval(swInt);swInt=null;elapsed=0;laps=[];swDisplay.textContent='00:00:00.000';
+    swStartBtn.textContent='Start';swLapBtn.disabled=true;swResetBtn.disabled=true;
+    lapsList.innerHTML='';
+  };
+})();
+</script>
+</body>
+</html>
